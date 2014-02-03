@@ -1,3 +1,4 @@
+db.sqlite
 *.pyc
 *.pyo
 *.egg-info
@@ -19,7 +20,9 @@ docs/_build
 .tox
 
 data/
-etc/
-
-june/_static/sea-modules/
-venv
+venv/
+cover/
+assets/components
+assets/node_modules
+assets/index.css
+june/public/static

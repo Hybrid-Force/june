@@ -1,36 +1,39 @@
 # Makefile for project June
 .PHONY: clean-pyc clean-build docs
 
-# Development
-all:
-	@pip install -r conf/reqs-dev.txt
-	@cp conf/githooks/* .git/hooks/
-	@chmod -R +x .git/hooks/
-
-
 server:
 	@python manager.py runserver
 
+upgrade:
+	@alembic upgrade head
 
-database:
-	@python manager.py createdb
+staticdir = june/public/static
+assets:
+	@$(MAKE) -C assets build
 
+static:
+	@$(MAKE) -C assets compile
+	@uglifyjs ${staticdir}/app.js -m -o ${staticdir}/app.js
 
 # translate
 babel-extract:
-	@pybabel extract -F conf/babel.cfg -o data/messages.pot .
+	@python setup.py extract_messages -o messages.pot
 
+language = zh
+i18n = june/translations
 babel-init:
-	@pybabel init -i data/messages.pot -d june/translations -l zh
+	@python setup.py init_catalog -i messages.pot -d ${i18n} -l ${language}
 
 babel-compile:
-	@pybabel compile -d june/translations
+	@python setup.py compile_catalog -d ${i18n}
 
 babel-update: babel-extract
-	@pybabel update -i data/messages.pot -d june/translations
+	@python setup.py update_catalog -i messages.pot -d ${i18n}
 
 # Common Task
 clean: clean-build clean-pyc
+	@rm -fr cover/
+
 
 clean-build:
 	@rm -fr build/
@@ -43,17 +46,17 @@ clean-pyc:
 	@find . -name '*.pyo' -exec rm -f {} +
 	@find . -name '*~' -exec rm -f {} +
 
-files := $(shell find . -name '*.py' ! -path "*__init__.py*" ! -path "*docs/*")
-lint:
-	@flake8 ${files}
 
-testing:
-	@nosetests -v
+lint:
+	@flake8 june
+	@flake8 tests
+
+test:
+	@nosetests -s
 
 coverage:
 	@rm -f .coverage
-	@nosetests --with-cov --cov june tests/
-	@rm -f .coverage
+	@nosetests --with-coverage --cover-package=june --cover-html
 
 # Sphinx Documentation
 docs:

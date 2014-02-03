@@ -1,20 +1,24 @@
 {% extends "layout.html" %}
-{% from "macro/form.html" import render_field %}
+{% from "snippet/macro.html" import form_field %}
 
-{% block subtitle %}{{_('Signin')}}{% endblock %}
+{% block subtitle %}{{ _('Sign In') }}{% endblock %}
 
-{% block whitepaper %}
-<form class="single" method="post" action="">
-  {{ form.csrf_token }}
-  {{ render_field(form.account, 'long') }}
-  {{ render_field(form.password, 'long') }}
+{% block main %}
+  <div class="panel panel-default single">
+    <form class="panel-body" role="form" method="post" action="">
+      <h2>{{ _('Sign In') }}</h2>
+      {{ form.csrf_token }}
+      {{ form_field(form.account) }}
+      {{ form_field(form.password) }}
 
-  <div class="checkbox-form">
-    {{form.permanent()}} {{form.permanent.label()}}
+      <div class="form-group">
+        {{ form.permanent() }} {{ form.permanent.label() }}
+      </div>
+
+      <div class="form-group">
+        <button class="btn btn-primary">{{ _('Sign In') }}</button>
+        <a class="btn btn-link" href="{{ url_for('.find') }}">{{ _('Forget Password?') }}</a>
+      </div>
+    </form>
   </div>
-
-  <div class="form-submit">
-    <button class="classy">Submit</button>
-  </div>
-</form>
 {% endblock %}

@@ -1,31 +1,27 @@
 # coding: utf-8
 
 import hashlib
-import random
 from datetime import datetime
-from werkzeug import cached_property
-from flask.ext.principal import Permission, UserNeed, RoleNeed
-from ._base import db, JuneQuery, SessionMixin
+from werkzeug import security
+from ._base import db, SessionMixin
 
-__all__ = ['Account']
+__all__ = ('Account', 'NonAccount')
 
 
 class Account(db.Model, SessionMixin):
-    query_class = JuneQuery
-
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(40), unique=True, index=True,
                          nullable=False)
-    email = db.Column(db.String(200), unique=True, index=True)
-    password = db.Column(db.String(100))
+    email = db.Column(db.String(200), nullable=False, unique=True, index=True)
+    password = db.Column(db.String(100), nullable=False)
 
     screen_name = db.Column(db.String(80))
     description = db.Column(db.String(400))
     city = db.Column(db.String(200))
     website = db.Column(db.String(400))
 
-    # for user: 1 - not verified, 2 - verified, > 20 staff > 40 admin
-    role = db.Column(db.Integer, default=1)
+    role = db.Column(db.String(10), default='new')
+    active = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
     created = db.Column(db.DateTime, default=datetime.utcnow)
     token = db.Column(db.String(20))
@@ -54,43 +50,51 @@ class Account(db.Model, SessionMixin):
     def __repr__(self):
         return '<Account: %s>' % self.username
 
-    @cached_property
-    def avatar(self):
-        size = 48
+    def avatar(self, size=48):
         md5email = hashlib.md5(self.email).hexdigest()
         query = "%s?s=%s%s" % (md5email, size, db.app.config['GRAVATAR_EXTRA'])
         return db.app.config['GRAVATAR_BASE_URL'] + query
 
-    @cached_property
-    def permission_write(self):
-        return Permission(UserNeed(self.id), RoleNeed('admin'))
-
-    @cached_property
-    def permission_admin(self):
-        return Permission(RoleNeed('admin'))
-
     @staticmethod
     def create_password(raw):
-        salt = Account.create_token(8)
-        passwd = '%s%s%s' % (salt, raw,
-                             db.app.config['PASSWORD_SECRET'])
-        hsh = hashlib.sha1(passwd).hexdigest()
-        return "%s$%s" % (salt, hsh)
+        passwd = '%s%s' % (raw, db.app.config['PASSWORD_SECRET'])
+        return security.generate_password_hash(passwd)
 
     @staticmethod
     def create_token(length=16):
-        chars = ('0123456789'
-                 'abcdefghijklmnopqrstuvwxyz'
-                 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
-        salt = ''.join([random.choice(chars) for i in range(length)])
-        return salt
+        return security.gen_salt(length)
+
+    @property
+    def is_staff(self):
+        if self.id == 1:
+            return True
+        return self.role == 'staff' or self.role == 'admin'
+
+    @property
+    def is_admin(self):
+        return self.id == 1 or self.role == 'admin'
 
     def check_password(self, raw):
-        if not self.password:
-            return False
-        if '$' not in self.password:
-            return False
-        salt, hsh = self.password.split('$')
-        passwd = '%s%s%s' % (salt, raw, db.app.config['PASSWORD_SECRET'])
-        verify = hashlib.sha1(passwd).hexdigest()
-        return verify == hsh
+        passwd = '%s%s' % (raw, db.app.config['PASSWORD_SECRET'])
+        return security.check_password_hash(self.password, passwd)
+
+    def change_password(self, raw):
+        self.password = self.create_password(raw)
+        self.token = self.create_token()
+        return self
+
+
+class NonAccount(object):
+    """Non Account is a model designed for the deleted account.
+    Since the account is deleted, the topics and replies will has no
+    account related to them, in such cases, a `NonAccount` is used."""
+
+    username = 'none'
+    is_staff = False
+    is_admin = False
+
+    def __str__(self):
+        return 'none'
+
+    def __repr__(self):
+        return '<NonAccount: none>'
